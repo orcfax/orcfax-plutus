@@ -1,5 +1,5 @@
 cabal-version:      2.4
-name:               plutus-starter
+name:               orcfax-plutus
 version:            0.1.0.0
 
 -- A short (one-line) description of the package.
@@ -68,14 +68,14 @@ test-suite plutus-example-projects-test
     plutus-tx-plugin,
     plutus-contract -any,
     plutus-ledger -any,
-    plutus-starter -any
+    orcfax-plutus -any
   build-depends:
     base >=4.9 && <5,
     tasty -any,
     tasty-hunit -any,
     tasty-hedgehog >=0.2.0.0
 
-executable plutus-starter-pab
+executable orcfax-plutus-pab
   import: lang
   main-is: Main.hs
   hs-source-dirs: pab
@@ -86,7 +86,7 @@ executable plutus-starter-pab
     data-default -any,
     plutus-contract -any,
     plutus-pab -any,
-    plutus-starter -any,
+    orcfax-plutus -any,
     aeson -any,
     freer-simple -any,
     prettyprinter -any,

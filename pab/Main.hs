@@ -32,7 +32,7 @@ import           Ledger.Index                        (ValidatorMode(..))
 
 main :: IO ()
 main = void $ Simulator.runSimulationWith handlers $ do
-    Simulator.logString @(Builtin StarterContracts) "Starting plutus-starter PAB webserver on port 8080. Press enter to exit."
+    Simulator.logString @(Builtin StarterContracts) "Starting orcfax-plutus PAB webserver on port 8080. Press enter to exit."
     shutdown <- PAB.Server.startServerDebug
     -- Example of spinning up a game instance on startup
     -- void $ Simulator.activateContract (Wallet 1) GameContract
