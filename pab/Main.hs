@@ -15,8 +15,9 @@ import           Control.Monad                       (void)
 import           Control.Monad.Freer                 (interpret)
 import           Control.Monad.IO.Class              (MonadIO (..))
 import           Data.Aeson                          (FromJSON (..), ToJSON (..), genericToJSON, genericParseJSON
-                                                     , defaultOptions, Options(..))
+                                                     , Result (..), fromJSON, defaultOptions, Options(..))
 import           Data.Default                        (def)
+import           Data.Monoid                         (Last (..))
 import qualified Data.OpenApi                        as OpenApi
 import           Data.Text.Prettyprint.Doc           (Pretty (..), viaShow)
 import           GHC.Generics                        (Generic)
@@ -27,13 +28,29 @@ import           Plutus.PAB.Simulator                (SimulatorEffectHandlers)
 import qualified Plutus.PAB.Simulator                as Simulator
 import qualified Plutus.PAB.Webserver.Server         as PAB.Server
 import           Plutus.Contracts.Game               as Game
+
+import           Oracle.PAB
+import qualified Oracle.Core                         as Oracle
+import qualified Oracle.Swap                         as Swap
+
 import           Plutus.Trace.Emulator.Extract       (writeScriptsTo, ScriptsConfig (..), Command (..))
 import           Ledger.Index                        (ValidatorMode(..))
+import           Wallet.Emulator.Wallet
+import           Wallet.Types                        (ContractInstanceId (..))
 
 main :: IO ()
 main = void $ Simulator.runSimulationWith handlers $ do
-    Simulator.logString @(Builtin StarterContracts) "Starting orcfax-plutus PAB webserver on port 8080. Press enter to exit."
+    Simulator.logString @(Builtin StarterContracts) "Starting plutus-starter PAB webserver on port 8080. Press enter to exit."
     shutdown <- PAB.Server.startServerDebug
+
+    cidInit  <- Simulator.activateContract (knownWallet 1) Init
+    cs       <- waitForLast (cidInit :: ContractInstanceId)
+    _        <- Simulator.waitUntilFinished cidInit
+
+    cidOracle <- Simulator.activateContract (knownWallet 1) $ Oracle cs
+    liftIO $ writeFile "oracle.cid" $ show $ unContractInstanceId cidOracle
+    --oracle    <- waitForLast (cidOracle :: ContractInstanceId)
+
     -- Example of spinning up a game instance on startup
     -- void $ Simulator.activateContract (Wallet 1) GameContract
     -- You can add simulator actions here:
@@ -51,6 +68,12 @@ main = void $ Simulator.runSimulationWith handlers $ do
 
     shutdown
 
+waitForLast :: FromJSON a => ContractInstanceId -> Simulator.Simulation t a
+waitForLast cid =
+    flip Simulator.waitForState cid $ \json -> case fromJSON json of
+        Success (Last (Just x)) -> Just x
+        _                       -> Nothing
+
 -- | An example of computing the script size for a particular trace.
 -- Read more: <https://plutus.readthedocs.io/en/latest/plutus/howtos/analysing-scripts.html>
 writeCostingScripts :: IO ()
@@ -64,8 +87,10 @@ writeCostingScripts = do
   putStrLn $ "ExBudget = " <> show exBudget
 
 
-data StarterContracts =
-    GameContract
+data StarterContracts = GameContract
+                      | Init
+                      | Oracle CurrencySymbol
+                      -- | Swap Oracle.Oracle
     deriving (Eq, Ord, Show, Generic)
     deriving anyclass OpenApi.ToSchema
 
@@ -87,15 +112,20 @@ instance Pretty StarterContracts where
     pretty = viaShow
 
 instance Builtin.HasDefinitions StarterContracts where
-    getDefinitions = [GameContract]
+    getDefinitions = [GameContract, Init]
     getSchema =  \case
         GameContract -> Builtin.endpointsToSchemas @Game.GameSchema
+        Init         -> Builtin.endpointsToSchemas @Empty
+        Oracle _     -> Builtin.endpointsToSchemas @Oracle.OracleSchema
+        -- Swap _       -> Builtin.endpointsToSchemas @Swap.SwapSchema
     getContract = \case
         GameContract -> SomeBuiltin (Game.game @ContractError)
+        Init         -> SomeBuiltin (initContract)
+        Oracle cs    -> SomeBuiltin $ Oracle.runOracle $ oracleParams cs
+        -- Swap oracle  -> SomeBuiltin $ Swap.swap oracle
 
 handlers :: SimulatorEffectHandlers (Builtin StarterContracts)
 handlers =
     Simulator.mkSimulatorHandlers def def
     $ interpret (contractHandler Builtin.handleBuiltin)
-
 
