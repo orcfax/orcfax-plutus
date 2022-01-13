@@ -9,7 +9,7 @@
 {-# LANGUAGE TypeFamilies       #-}
 {-# LANGUAGE TypeOperators      #-}
 
-module Main(main, writeCostingScripts) where
+module Main(main) where
 
 import           Control.Monad                       (void)
 import           Control.Monad.Freer                 (interpret)
@@ -27,7 +27,6 @@ import qualified Plutus.PAB.Effects.Contract.Builtin as Builtin
 import           Plutus.PAB.Simulator                (SimulatorEffectHandlers)
 import qualified Plutus.PAB.Simulator                as Simulator
 import qualified Plutus.PAB.Webserver.Server         as PAB.Server
-import           Plutus.Contracts.Game               as Game
 
 import           Oracle.PAB
 import qualified Oracle.Core                         as Oracle
@@ -49,15 +48,9 @@ main = void $ Simulator.runSimulationWith handlers $ do
 
     cidOracle <- Simulator.activateContract (knownWallet 1) $ Oracle cs
     liftIO $ writeFile "oracle.cid" $ show $ unContractInstanceId cidOracle
-    --oracle    <- waitForLast (cidOracle :: ContractInstanceId)
+    -- the following line does not work which is weird because it's exactly the same as line 47, and that one does work!!!
+    -- oracle    <- waitForLast (cidOracle :: ContractInstanceId)
 
-    -- Example of spinning up a game instance on startup
-    -- void $ Simulator.activateContract (Wallet 1) GameContract
-    -- You can add simulator actions here:
-    -- Simulator.observableState
-    -- etc.
-    -- That way, the simulation gets to a predefined state and you don't have to
-    -- use the HTTP API for setup.
 
     -- Pressing enter results in the balances being printed
     void $ liftIO getLine
@@ -74,21 +67,7 @@ waitForLast cid =
         Success (Last (Just x)) -> Just x
         _                       -> Nothing
 
--- | An example of computing the script size for a particular trace.
--- Read more: <https://plutus.readthedocs.io/en/latest/plutus/howtos/analysing-scripts.html>
-writeCostingScripts :: IO ()
-writeCostingScripts = do
-  let config = ScriptsConfig { scPath = "/tmp/plutus-costing-outputs/", scCommand = cmd }
-      cmd    = Scripts { unappliedValidators = FullyAppliedValidators }
-      -- Note: Here you can use any trace you wish.
-      trace  = correctGuessTrace
-  (totalSize, exBudget) <- writeScriptsTo config "game" trace def
-  putStrLn $ "Total size = " <> show totalSize
-  putStrLn $ "ExBudget = " <> show exBudget
-
-
-data StarterContracts = GameContract
-                      | Init
+data StarterContracts = Init
                       | Oracle CurrencySymbol
                       -- | Swap Oracle.Oracle
     deriving (Eq, Ord, Show, Generic)
@@ -112,14 +91,12 @@ instance Pretty StarterContracts where
     pretty = viaShow
 
 instance Builtin.HasDefinitions StarterContracts where
-    getDefinitions = [GameContract, Init]
+    getDefinitions = [Init]
     getSchema =  \case
-        GameContract -> Builtin.endpointsToSchemas @Game.GameSchema
         Init         -> Builtin.endpointsToSchemas @Empty
         Oracle _     -> Builtin.endpointsToSchemas @Oracle.OracleSchema
         -- Swap _       -> Builtin.endpointsToSchemas @Swap.SwapSchema
     getContract = \case
-        GameContract -> SomeBuiltin (Game.game @ContractError)
         Init         -> SomeBuiltin (initContract)
         Oracle cs    -> SomeBuiltin $ Oracle.runOracle $ oracleParams cs
         -- Swap oracle  -> SomeBuiltin $ Swap.swap oracle

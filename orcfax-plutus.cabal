@@ -46,7 +46,6 @@ library
       Oracle.PAB
       Oracle.Swap
       Oracle.Test
-      Plutus.Contracts.Game
     build-depends:
         aeson
       , base >= 4.9 && < 5
