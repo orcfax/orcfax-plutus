@@ -6,6 +6,8 @@ This project gives an example for a simple Oracle using the Plutus Platform. The
 
 ## Setting up
 
+Install nix: (https://nixos.org/download.html)
+
 ## The Plutus Application Backend (PAB) example
 
 We have provided an Oracle PAB application in `./pab/Main.hs`. With the PAB we can serve and interact
